@@ -6,6 +6,229 @@ datasource db {
   provider = "postgresql"
 }
 
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+
+  @@index([isActive])
+}
+
+model Product {
+  id              String      @id @default(cuid())
+  name            String
+  slug            String      @unique
+  description     String?
+  imageUrl        String?
+  priceCents      Int
+  promoPriceCents Int?
+  unitLabel       String      @default("kg")
+  isActive        Boolean     @default(true)
+  categoryId      String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  cartItems       CartItem[]
+  inventory       Inventory?
+  orderItems      OrderItem[]
+  category        Category    @relation(fields: [categoryId], references: [id])
+
+  @@index([categoryId])
+  @@index([isActive])
+}
+
+model Inventory {
+  id          String   @id @default(cuid())
+  productId   String   @unique
+  quantity    Int      @default(0)
+  minQuantity Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([quantity])
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  userId     String?  @unique
+  name       String
+  email      String?
+  phone      String?
+  document   String?  @unique
+  street     String?
+  number     String?
+  district   String?
+  city       String?
+  state      String?
+  zipCode    String?
+  complement String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  cart       Cart?
+  user       User?    @relation(fields: [userId], references: [id])
+  orders     Order[]
+
+  @@index([city])
+  @@index([state])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  cpf           String?   @unique
+  passwordHash  String?
+  role          UserRole  @default(USER)
+  isActive      Boolean   @default(true)
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  customer      Customer?
+  accounts      Account[]
+  sessions      Session[]
+
+  @@index([role])
+  @@index([isActive])
+  @@map("user")
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  code          String      @unique
+  status        OrderStatus @default(PENDING)
+  customerId    String
+  subtotalCents Int
+  discountCents Int         @default(0)
+  shippingCents Int         @default(0)
+  totalCents    Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  customer      Customer    @relation(fields: [customerId], references: [id])
+  items         OrderItem[]
+  payments      Payment[]
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model OrderItem {
+  id             String   @id @default(cuid())
+  orderId        String
+  productId      String
+  quantity       Int
+  unitPriceCents Int
+  totalCents     Int
+  createdAt      DateTime @default(now())
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  orderId          String
+  method           PaymentMethod
+  status           PaymentStatus @default(PENDING)
+  amountCents      Int
+  gateway          String        @default("abacatepay")
+  gatewayPaymentId String?       @unique
+  externalId       String?       @unique
+  checkoutUrl      String?
+  rawResponse      Json?
+  rawWebhook       Json?
+  paidAt           DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+  @@index([method])
+  @@index([externalId])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Cart {
+  id         String     @id @default(cuid())
+  customerId String     @unique
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items      CartItem[]
+
+  @@index([customerId])
+}
+
+model CartItem {
+  id             String   @id @default(cuid())
+  cartId         String
+  productId      String
+  quantity       Int
+  unitPriceCents Int
+  totalCents     Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  cart           Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product        Product  @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+}
+
 enum UserRole {
   ADMIN
   STAFF
@@ -34,259 +257,4 @@ enum PaymentStatus {
   FAILED
   CANCELED
   REFUNDED
-}
-
-model Category {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  slug      String    @unique
-  isActive  Boolean   @default(true)
-
-  products  Product[]
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@index([isActive])
-}
-
-model Product {
-  id              String      @id @default(cuid())
-  name            String
-  slug            String      @unique
-  description     String?
-  imageUrl        String?
-  priceCents      Int
-  promoPriceCents Int?
-  unitLabel       String      @default("kg")
-  isActive        Boolean     @default(true)
-
-  categoryId      String
-  category        Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-
-  inventory       Inventory?
-  orderItems      OrderItem[]
-  cartItems       CartItem[]
-
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  @@index([categoryId])
-  @@index([isActive])
-}
-
-model Inventory {
-  id          String    @id @default(cuid())
-  productId   String    @unique
-  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  quantity    Int       @default(0)
-  minQuantity Int       @default(0)
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([quantity])
-}
-
-model Customer {
-  id         String    @id @default(cuid())
-  userId     String?   @unique
-
-  name       String
-  email      String?
-  phone      String?
-  document   String?   @unique
-
-  street     String?
-  number     String?
-  district   String?
-  city       String?
-  state      String?
-  zipCode    String?
-  complement String?
-
-  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  orders     Order[]
-  cart       Cart?
-
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  @@index([city])
-  @@index([state])
-}
-
-model User {
-  id            String        @id @default(cuid())
-  name          String
-  email         String        @unique
-  cpf           String?       @unique
-  passwordHash  String?
-  role          UserRole
-  isActive      Boolean       @default(true)
-  emailVerified Boolean       @default(false)
-  image         String?
-
-  customer      Customer?
-  sessions      Session[]
-  accounts      Account[]
-
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  @@index([role])
-  @@index([isActive])
-  @@map("user")
-}
-
-model Order {
-  id            String        @id @default(cuid())
-  code          String        @unique
-  status        OrderStatus   @default(PENDING)
-
-  customerId    String
-  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
-
-  subtotalCents Int
-  discountCents Int           @default(0)
-  shippingCents Int           @default(0)
-  totalCents    Int
-
-  items         OrderItem[]
-  payments      Payment[]
-
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  @@index([customerId])
-  @@index([status])
-}
-
-model OrderItem {
-  id             String    @id @default(cuid())
-
-  orderId        String
-  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  productId      String
-  product        Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
-
-  quantity       Int
-  unitPriceCents Int
-  totalCents     Int
-
-  createdAt      DateTime  @default(now())
-
-  @@index([orderId])
-  @@index([productId])
-}
-
-model Payment {
-  id               String         @id @default(cuid())
-
-  orderId          String
-  order            Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  method           PaymentMethod
-  status           PaymentStatus  @default(PENDING)
-
-  amountCents      Int
-  gateway          String         @default("abacatepay")
-  gatewayPaymentId String?        @unique
-  externalId       String?        @unique
-  checkoutUrl      String?
-  rawResponse      Json?
-  rawWebhook       Json?
-  paidAt           DateTime?
-
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-
-  @@index([orderId])
-  @@index([status])
-  @@index([method])
-  @@index([externalId])
-}
-
-model Session {
-  id        String   @id
-  expiresAt DateTime
-  token     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([token])
-  @@index([userId])
-  @@map("session")
-}
-
-model Account {
-  id                    String   @id
-  accountId             String
-  providerId            String
-  userId                String
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accessToken           String?
-  refreshToken          String?
-  idToken               String?
-  accessTokenExpiresAt  DateTime?
-  refreshTokenExpiresAt DateTime?
-  scope                 String?
-  password              String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  @@index([userId])
-  @@map("account")
-}
-
-model Verification {
-  id         String   @id
-  identifier String
-  value      String
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([identifier])
-  @@map("verification")
-}
-
-model Cart {
-  id         String     @id @default(cuid())
-  customerId String     @unique
-  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  items      CartItem[]
-
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-
-  @@index([customerId])
-}
-
-model CartItem {
-  id             String    @id @default(cuid())
-
-  cartId         String
-  cart           Cart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
-
-  productId      String
-  product        Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
-
-  quantity       Int
-  unitPriceCents Int
-  totalCents     Int
-
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  @@unique([cartId, productId])
-  @@index([cartId])
-  @@index([productId])
 }

@@ -28,11 +28,32 @@ export async function createAdminService(data: CreateAdminInput) {
     },
   });
 
-  const user = await prisma.user.update({
-    where: { email: data.email },
-    data: {
-      role: data.role,
-    },
+  const user = await prisma.$transaction(async (tx) => {
+    const updatedUser = await tx.user.update({
+      where: { email: data.email },
+      data: {
+        role: data.role,
+      },
+    });
+
+    const existingCustomer = await tx.customer.findUnique({
+      where: {
+        userId: updatedUser.id,
+      },
+    });
+
+    if (existingCustomer) {
+      await tx.customer.update({
+        where: {
+          id: existingCustomer.id,
+        },
+        data: {
+          userId: null,
+        },
+      });
+    }
+
+    return updatedUser;
   });
 
   return user;
