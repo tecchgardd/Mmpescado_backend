@@ -2,20 +2,31 @@ import { prisma } from "../../database/prisma.js";
 
 export async function listCategoriesService() {
   try {
-    const categories = await prisma.category.findMany({
+    return await prisma.category.findMany({
       orderBy: {
         createdAt: "desc",
       },
-      include: {
-        _count: {
+      select: {
+        id: true,
+        name: true,
+        isActive: true,
+        products: {
           select: {
-            products: true,
-          },
+            id: true,
+            name: true,
+            description: true,
+            priceCents: true,
+            imageUrl: true,
+            inventory: {
+              select: {
+                quantity: true,
+              }
+            }
+
+          }
         },
       },
     });
-
-    return categories;
   } catch {
     throw {
       status: 500,

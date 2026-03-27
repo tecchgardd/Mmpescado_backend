@@ -11,7 +11,7 @@ function generateOrderCode() {
 }
 
 type CreateOrderInput = {
-  userId: string;
+  customerId: string;
   discountCents?: number;
   shippingCents?: number;
 };
@@ -22,9 +22,10 @@ export async function createOrderService(
   const discountCents = input.discountCents ?? 0;
   const shippingCents = input.shippingCents ?? 0;
 
+
   const customer = await prisma.customer.findUnique({
     where: {
-      userId: input.userId,
+      userId: input.customerId,
     },
     include: {
       cart: {
