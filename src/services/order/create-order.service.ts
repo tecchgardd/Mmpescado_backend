@@ -12,16 +12,15 @@ function generateOrderCode() {
 
 type CreateOrderInput = {
   customerId: string;
-  discountCents?: number;
-  shippingCents?: number;
+  discountCents?: number;  // Verificar se essas duas variaveis fazem sentido no projeto ainda ( discountCents e shippingCents )
+  shippingCents?: number;  // Verificar se essas duas variaveis fazem sentido no projeto ainda ( discountCents e shippingCents )
 };
 
 export async function createOrderService(
   input: CreateOrderInput,
 ) {
-  const discountCents = input.discountCents ?? 0;
-  const shippingCents = input.shippingCents ?? 0;
-
+  const discountCents = input.discountCents ?? 0;  // Verificar se essas duas variaveis fazem sentido no projeto ainda ( discountCents e shippingCents )
+  const shippingCents = input.shippingCents ?? 0;  // Verificar se essas duas variaveis fazem sentido no projeto ainda ( discountCents e shippingCents )
 
   const customer = await prisma.customer.findUnique({
     where: {
@@ -107,7 +106,9 @@ export async function createOrderService(
         message: `Estoque insuficiente para o produto ${product.name}.`,
       };
     }
-
+  
+    // Nesse caso aqui, o preço promocional tem prioridade sobre o preço normal, caso esteja definido. Se não houver preço promocional, o sistema usará o preço normal.
+    // Faz sentido?
     const unitPriceCents = product.promoPriceCents ?? product.priceCents;
     const totalCents = unitPriceCents * cartItem.quantity;
 
@@ -121,7 +122,8 @@ export async function createOrderService(
     };
   });
 
-  const totalCents = subtotalCents - discountCents + shippingCents;
+ // Verificar se essas duas variaveis fazem sentido no projeto ainda ( discountCents e shippingCents )
+  const totalCents = subtotalCents - discountCents + shippingCents; 
 
   if (totalCents < 0) {
     throw {

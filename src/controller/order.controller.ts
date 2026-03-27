@@ -8,7 +8,17 @@ import { updateOrderStatusService } from "../services/order/update-order-status.
 class OrderController {
   async create(req: Request, res: Response) {
     try {
-      const order = await createOrderService(req.body);
+      const userId = req.currentUser?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          message: "Não autenticado.",
+        });
+      }
+
+      const order = await createOrderService({
+        customerId: userId,
+      });
 
       return res.status(201).json({
         message: "Pedido criado com sucesso.",

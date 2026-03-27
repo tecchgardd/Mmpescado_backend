@@ -7,20 +7,6 @@ import { validateBody } from "../middlewares/validate.middleware.js";
 
 const orderRoutes = Router();
 
-const createOrderSchema = z.object({
-  customerId: z.string().min(1, "customerId é obrigatório."),
-  discountCents: z.number().int().min(0).optional(),
-  shippingCents: z.number().int().min(0).optional(),
-  items: z
-    .array(
-      z.object({
-        productId: z.string().min(1, "productId é obrigatório."),
-        quantity: z.number().int().positive("quantity deve ser maior que zero."),
-      }),
-    )
-    .min(1, "O pedido precisa ter ao menos um item."),
-});
-
 const updateOrderStatusSchema = z.object({
   status: z.enum([
     "PENDING",
@@ -36,7 +22,6 @@ orderRoutes.post(
   "/",
   requireAuth,
   requireRole("ADMIN", "STAFF"),
-  validateBody(createOrderSchema),
   orderController.create.bind(orderController),
 );
 
