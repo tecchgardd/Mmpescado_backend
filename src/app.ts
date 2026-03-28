@@ -10,11 +10,14 @@ import {
   globalRateLimit,
   webhookRateLimit,
 } from "./middlewares/rate-limit.middleware.js";
+import cors from "cors";
 
 const app = express();
 
 app.use(httpLogger);
 app.use(globalRateLimit);
+
+app.use(cors({ origin: 'http://localhost:5173', credentials: true })   ); // Precisa dar uma olahda nisso depois para ver se é isso mesmo
 
 app.use("/api/auth", authRateLimit, betterAuthRoutes);
 
