@@ -1,4 +1,10 @@
 import { prisma } from "../../database/prisma.js";
+import { cloudinary } from "../../utils/cloudinary.js";
+
+function extractCloudinaryPublicId(url: string): string | null {
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-z]+$/i);
+  return match ? match[1] : null;
+}
 
 export async function deleteProductService(id: string) {
   try {
@@ -31,6 +37,13 @@ export async function deleteProductService(id: string) {
     await prisma.product.delete({
       where: { id },
     });
+
+    if (existingProduct.imageUrl) {
+      const publicId = extractCloudinaryPublicId(existingProduct.imageUrl);
+      if (publicId) {
+        await cloudinary.uploader.destroy(publicId).catch(() => null);
+      }
+    }
 
     return {
       message: "Produto deletado com sucesso.",
