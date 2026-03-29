@@ -43,6 +43,7 @@ class ProductController {
         const uploaded = await uploadProductImageService(req.file.buffer) as { secure_url: string };
         imageUrl = uploaded.secure_url;
       }
+      //
 
       const product = await createProductService({ ...req.body, imageUrl });
 
