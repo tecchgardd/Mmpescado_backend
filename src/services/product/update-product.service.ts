@@ -1,4 +1,10 @@
 import { prisma } from "../../database/prisma.js";
+import { cloudinary } from "../../utils/cloudinary.js";
+
+function extractCloudinaryPublicId(url: string): string | null {
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-z]+$/i);
+  return match ? match[1] : null;
+}
 
 export type UpdateProductInput = {
   name?: string;
@@ -110,6 +116,13 @@ export async function updateProductService(id: string, data: UpdateProductInput)
         },
       });
     });
+
+    if (data.imageUrl && existingProduct.imageUrl && data.imageUrl !== existingProduct.imageUrl) {
+      const publicId = extractCloudinaryPublicId(existingProduct.imageUrl);
+      if (publicId) {
+        await cloudinary.uploader.destroy(publicId).catch(() => null);
+      }
+    }
 
     return product;
   } catch (error) {
