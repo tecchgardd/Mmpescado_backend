@@ -3,6 +3,7 @@ import { createProductService } from "../services/product/create-product.service
 import { deleteProductService } from "../services/product/delete-product.service.js";
 import { listProductsService } from "../services/product/list-products.service.js";
 import { updateProductService } from "../services/product/update-product.service.js";
+import { uploadProductImageService } from "../services/upload/upload-product-image.service.js";
 
 class ProductController {
   async list(req: Request, res: Response) {
@@ -36,7 +37,14 @@ class ProductController {
 
   async create(req: Request, res: Response) {
     try {
-      const product = await createProductService(req.body);
+      let imageUrl: string | undefined;
+
+      if (req.file) {
+        const uploaded = await uploadProductImageService(req.file.buffer) as { secure_url: string };
+        imageUrl = uploaded.secure_url;
+      }
+
+      const product = await createProductService({ ...req.body, imageUrl });
 
       return res.status(201).json({
         message: "Produto criado com sucesso.",
