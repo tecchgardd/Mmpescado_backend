@@ -38,7 +38,6 @@ const updateProductSchema = z
     name: z.string().min(2, "Nome deve ter no mínimo 2 caracteres.").optional(),
     slug: z.string().min(2, "Slug deve ter no mínimo 2 caracteres.").optional(),
     description: z.string().nullable().optional(),
-    imageUrl: z.string().url("URL da imagem inválida.").nullable().optional(),
     priceCents: z.number().int().min(0, "Preço inválido.").optional(),
     promoPriceCents: z.number().int().min(0, "Preço promocional inválido.").nullable().optional(),
     unitLabel: z.string().min(1, "Unidade inválida.").optional(),
@@ -65,6 +64,8 @@ productRoutes.patch(
   "/:id",
   requireAuth,
   requireRole("ADMIN", "STAFF"),
+  upload.single("image"),
+  parseProductJson,
   validateBody(updateProductSchema),
   productController.update.bind(productController),
 );

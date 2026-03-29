@@ -60,7 +60,15 @@ class ProductController {
   async update(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const product = await updateProductService(id, req.body);
+
+      let imageUrl: string | undefined;
+
+      if (req.file) {
+        const uploaded = await uploadProductImageService(req.file.buffer) as { secure_url: string };
+        imageUrl = uploaded.secure_url;
+      }
+
+      const product = await updateProductService(id, { ...req.body, imageUrl });
 
       return res.status(200).json({
         message: "Produto atualizado com sucesso.",
