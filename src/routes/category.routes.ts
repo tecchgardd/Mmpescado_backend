@@ -23,8 +23,8 @@ const updateCategorySchema = z
     message: "Informe ao menos um campo para atualização.",
   });
 
-categoryRoutes.get("/", requireAuth, requireRole("ADMIN", "STAFF"), categoryController.list.bind(categoryController));
-categoryRoutes.get("/all", requireAuth, requireRole("ADMIN", "STAFF"), categoryController.listAll.bind(categoryController));
+categoryRoutes.get("/", requireAuth, categoryController.list.bind(categoryController));
+categoryRoutes.get("/all", requireAuth, categoryController.listAll.bind(categoryController));
 categoryRoutes.post(
   "/",
   requireAuth,
