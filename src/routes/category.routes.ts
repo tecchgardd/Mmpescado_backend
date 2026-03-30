@@ -24,6 +24,7 @@ const updateCategorySchema = z
   });
 
 categoryRoutes.get("/", requireAuth, requireRole("ADMIN", "STAFF"), categoryController.list.bind(categoryController));
+categoryRoutes.get("/all", requireAuth, requireRole("ADMIN", "STAFF"), categoryController.listAll.bind(categoryController));
 categoryRoutes.post(
   "/",
   requireAuth,
