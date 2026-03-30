@@ -25,7 +25,10 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-app.use("/api/auth", authRateLimit, betterAuthRoutes);
+app.use("/api/auth", (_req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
+  next();
+}, authRateLimit, betterAuthRoutes);
 
 app.use(
   "/api/webhooks",
