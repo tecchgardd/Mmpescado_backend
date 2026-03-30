@@ -21,6 +21,14 @@ export const auth = betterAuth({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
-    
+  },
+
+  advanced: {
+    useSecureCookies: false,
+    defaultCookieAttributes: {
+      sameSite: "lax",
+      httpOnly: true,
+      secure: false,
+    },
   },
 });
