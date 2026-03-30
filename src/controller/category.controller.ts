@@ -7,6 +7,7 @@ import { listAllCategoriesService } from "../services/category/list-all-categori
 
 class CategoryController {
   async list(_req: Request, res: Response) {
+    console.log("Listando categorias...",_req);
     try {
       const categories = await listCategoriesService();
 
