@@ -1,11 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.js";
-import {
-  createAbacateCustomer,
-  createAbacatePayCheckout,
-} from "../../integrations/abacatepay.js";
+import { createAbacateBilling } from "../../integrations/abacatepay.js";
 import { ensureCustomerForUserService } from "../customer/ensure-customer-for-user.service.js";
-import { ensureAbacateProductService } from "../product/ensure-abacate-product.service.js";
 
 function generateOrderCode() {
   const now = new Date();
@@ -107,7 +103,11 @@ export async function createOrderService(input: CreateOrderInput) {
       };
     }
 
-    const unitPriceCents = product.promoPriceCents ?? product.priceCents;
+    const unitPriceCents =
+      (product.promoPriceCents ?? 0) > product.priceCents
+        ? product.priceCents
+        : (product.promoPriceCents ?? product.priceCents);
+
     const totalCents = unitPriceCents * cartItem.quantity;
 
     subtotalCents += totalCents;
@@ -128,44 +128,44 @@ export async function createOrderService(input: CreateOrderInput) {
 
   const orderCode = generateOrderCode();
   let checkout: any = null;
-  let abacateCustomer: any = null;
 
   if (paymentMethod === "ABACATEPAY") {
     try {
-      const checkoutItems = await Promise.all(
-        customer.cart.items.map(async (cartItem) => ({
-          id: await ensureAbacateProductService(cartItem.product.id),
+      const billingProducts = customer.cart.items.map((cartItem) => {
+        const product = cartItem.product;
+        const price =
+          (product.promoPriceCents ?? 0) > product.priceCents
+            ? product.priceCents
+            : (product.promoPriceCents ?? product.priceCents);
+        return {
+          externalId: product.id,
+          name: product.name,
+          description: (product as any).description ?? product.name,
           quantity: cartItem.quantity,
-        })),
-      );
+          price,
+        };
+      });
 
       const contactEmail = input.contact?.email || customer.email;
-
-      if (contactEmail) {
-        try {
-          abacateCustomer = await createAbacateCustomer({
+      const inlineCustomer = contactEmail
+        ? {
             email: contactEmail,
             name: input.contact?.name || customer.name,
             cellphone: input.contact?.phone || customer.phone,
             taxId: input.contact?.taxId || customer.document,
-            zipCode: input.delivery?.zipCode,
-          });
-        } catch (customerError) {
-          console.error(
-            "Erro ao criar cliente na AbacatePay, seguindo sem customer:",
-            customerError,
-          );
-        }
-      }
+          }
+        : undefined;
 
-      checkout = await createAbacatePayCheckout({
-        items: checkoutItems,
+      checkout = await createAbacateBilling({
+        products: billingProducts,
         externalId: String(orderCode),
         returnUrl:
           process.env.ABACATEPAY_RETURN_URL || process.env.FRONTEND_URL,
         completionUrl:
           process.env.ABACATEPAY_COMPLETION_URL ||
           `${process.env.FRONTEND_URL || ""}/loja/pedidos`,
+        customer: inlineCustomer,
+        metadata: { orderCode },
       });
     } catch (error: any) {
       console.error(
@@ -199,18 +199,13 @@ export async function createOrderService(input: CreateOrderInput) {
         },
         payments: {
           create: {
-            method: paymentMethod === "ABACATEPAY" ? "PIX" : "PIX",
+            method: "PIX",
             status: "PENDING",
             amountCents: totalCents,
             gateway: paymentMethod === "ABACATEPAY" ? "abacatepay" : "manual",
-            gatewayPaymentId: checkout?.id || null,
+            gatewayPaymentId: checkout?.id ?? null,
             externalId: String(orderCode),
-            checkoutUrl:
-              checkout?.url ||
-              checkout?.checkoutUrl ||
-              checkout?.data?.url ||
-              checkout?.data?.checkoutUrl ||
-              null,
+            checkoutUrl: checkout?.url ?? null,
             rawResponse: (checkout ?? null) as Prisma.InputJsonValue,
           },
         },
@@ -242,13 +237,7 @@ export async function createOrderService(input: CreateOrderInput) {
     return createdOrder;
   });
 
-  const redirectUrl =
-    checkout?.url ||
-    checkout?.checkoutUrl ||
-    checkout?.data?.url ||
-    checkout?.data?.checkoutUrl ||
-    order.payments?.[0]?.checkoutUrl ||
-    null;
+  const redirectUrl = checkout?.url ?? order.payments?.[0]?.checkoutUrl ?? null;
 
   return {
     order,

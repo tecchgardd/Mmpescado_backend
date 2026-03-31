@@ -7,9 +7,20 @@ type JsonObject = { [key: string]: JsonValue };
 
 type WebhookPayload = {
   event: string;
-  apiVersion: number;
-  devMode: boolean;
+  devMode?: boolean;
   data: {
+    // v1/billing format
+    billing?: {
+      id?: string;
+      externalId?: string;
+      url?: string;
+      amount?: number;
+      paidAmount?: number;
+      status?: string;
+      updatedAt?: string;
+      createdAt?: string;
+    };
+    // v2/checkout format (legado)
     checkout?: {
       id?: string;
       externalId?: string;
@@ -39,20 +50,21 @@ function toPrismaJson(value: WebhookPayload): Prisma.InputJsonValue {
 export async function handleAbacatepayWebhookService(
   payload: WebhookPayload,
 ) {
+  console.log("Received AbacatePay webhook:", payload.data);
   const event = payload.event;
-  const checkout = payload.data?.checkout;
+  const billing = payload.data?.billing ?? payload.data?.checkout;
   const rawWebhookJson = toPrismaJson(payload);
 
-  if (!checkout?.externalId) {
-    throw {
-      status: 400,
-      message: "Webhook sem externalId.",
-    };
+  if (!billing?.externalId && !billing?.id) {
+    return { ok: true, action: "ignored" };
   }
 
   const payment = await prisma.payment.findFirst({
     where: {
-      externalId: checkout.externalId,
+      OR: [
+        ...(billing.externalId ? [{ externalId: billing.externalId }] : []),
+        ...(billing.id ? [{ gatewayPaymentId: billing.id }] : []),
+      ],
     },
     include: {
       order: {
@@ -64,22 +76,19 @@ export async function handleAbacatepayWebhookService(
   });
 
   if (!payment) {
-    throw {
-      status: 404,
-      message: "Pagamento não encontrado para o externalId informado.",
-    };
+    return { ok: true, action: "ignored" };
   }
 
-  if (event === "checkout.completed") {
-    const paidAt = checkout.updatedAt ? new Date(checkout.updatedAt) : new Date();
+  if (event === "billing.paid" || event === "checkout.completed") {
+    const paidAt = billing.updatedAt ? new Date(billing.updatedAt) : new Date();
 
     await prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: payment.id },
         data: {
           status: "APPROVED",
-          gatewayPaymentId: checkout.id ?? payment.gatewayPaymentId,
-          checkoutUrl: checkout.url ?? payment.checkoutUrl,
+          gatewayPaymentId: billing.id ?? payment.gatewayPaymentId,
+          checkoutUrl: billing.url ?? payment.checkoutUrl,
           rawWebhook: rawWebhookJson,
           paidAt,
         },
@@ -96,7 +105,7 @@ export async function handleAbacatepayWebhookService(
     return { ok: true, action: "approved" };
   }
 
-  if (event === "checkout.refunded") {
+  if (event === "billing.refunded" || event === "checkout.refunded") {
     await prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: payment.id },
@@ -136,7 +145,7 @@ export async function handleAbacatepayWebhookService(
     return { ok: true, action: "refunded" };
   }
 
-  if (event === "checkout.disputed") {
+  if (event === "billing.disputed" || event === "checkout.disputed") {
     await prisma.payment.update({
       where: { id: payment.id },
       data: {

@@ -108,6 +108,87 @@ export async function createAbacateCustomer(input: AbacateCustomerInput) {
   }
 }
 
+type AbacateBillingProduct = {
+  externalId: string;
+  name: string;
+  description?: string;
+  quantity: number;
+  price: number;
+};
+
+type AbacateBillingInput = {
+  products: AbacateBillingProduct[];
+  returnUrl?: string;
+  completionUrl?: string;
+  customerId?: string;
+  customer?: {
+    name?: string | null;
+    cellphone?: string | null;
+    email: string;
+    taxId?: string | null;
+  };
+  externalId?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export async function createAbacateBilling(input: AbacateBillingInput) {
+  try {
+    if (!input.products || !input.products.length) {
+      throw {
+        status: 400,
+        message: "Nenhum produto informado para criar o billing.",
+      };
+    }
+
+    const body: Record<string, unknown> = {
+      frequency: "ONE_TIME",
+      methods: ["PIX", "CARD"],
+      products: input.products,
+    };
+
+    if (input.externalId) body.externalId = String(input.externalId);
+    if (input.returnUrl) body.returnUrl = input.returnUrl;
+    if (input.completionUrl) body.completionUrl = input.completionUrl;
+    if (input.customerId) body.customerId = input.customerId;
+    if (input.customer) body.customer = input.customer;
+    if (input.metadata) body.metadata = input.metadata;
+
+    console.log("Payload billing AbacatePay:", JSON.stringify(body, null, 2));
+
+    const response = await axios.post(
+      "https://api.abacatepay.com/v1/billing/create",
+      body,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getApiToken()}`,
+        },
+      },
+    );
+
+    console.log(
+      "Resposta billing AbacatePay:",
+      JSON.stringify(response.data, null, 2),
+    );
+
+    return response.data?.data ?? response.data;
+  } catch (error: any) {
+    console.error(
+      "Erro AbacatePay create billing:",
+      error?.response?.status,
+      error?.response?.data || error?.message || error,
+    );
+
+    throw {
+      status: error?.response?.status || 400,
+      message:
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        "Falha ao gerar billing no AbacatePay.",
+    };
+  }
+}
+
 export async function createAbacatePayCheckout(input: AbacateCheckoutInput) {
   try {
     if (!input.items || !input.items.length) {
