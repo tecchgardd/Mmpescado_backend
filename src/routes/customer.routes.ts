@@ -25,6 +25,15 @@ const updateCustomerSchema = z
     message: "Informe ao menos um campo para atualização.",
   });
 
+customerRoutes.get("/me", requireAuth, requireRole("USER", "ADMIN", "STAFF"), customerController.getMe.bind(customerController));
+customerRoutes.patch(
+  "/me",
+  requireAuth,
+  requireRole("USER", "ADMIN", "STAFF"),
+  validateBody(updateCustomerSchema),
+  customerController.updateMe.bind(customerController),
+);
+
 customerRoutes.get("/", requireAuth, requireRole("ADMIN", "STAFF"), customerController.list.bind(customerController));
 customerRoutes.patch(
   "/:id",

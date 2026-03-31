@@ -1,4 +1,5 @@
 import { prisma } from "../../database/prisma.js";
+import { ensureCustomerForUserService } from "../customer/ensure-customer-for-user.service.js";
 import { getOrCreateCartService } from "./get-or-create-cart.service.js";
 
 type AddCartItemInput = {
@@ -8,21 +9,7 @@ type AddCartItemInput = {
 };
 
 export async function addCartItemService(input: AddCartItemInput) {
-  const user = await prisma.user.findUnique({
-    where: {
-      id: input.userId,
-    },
-    include: {
-      customer: true,
-    }
-  });
-
-  if (!user?.customer) {
-    throw {
-      status: 404,
-      message: "Customer não encontrado para este usuário.",
-    };
-  }
+  const customer = await ensureCustomerForUserService(input.userId);
 
   const product = await prisma.product.findUnique({
     where: {
@@ -61,7 +48,7 @@ export async function addCartItemService(input: AddCartItemInput) {
     };
   }
 
-  const cart = await getOrCreateCartService(user.customer.id);
+  const cart = await getOrCreateCartService(customer.id);
 
   const existingItem = await prisma.cartItem.findUnique({
     where: {

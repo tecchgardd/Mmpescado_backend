@@ -1,4 +1,11 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.js";
+import {
+  createAbacateCustomer,
+  createAbacatePayCheckout,
+} from "../../integrations/abacatepay.js";
+import { ensureCustomerForUserService } from "../customer/ensure-customer-for-user.service.js";
+import { ensureAbacateProductService } from "../product/ensure-abacate-product.service.js";
 
 function generateOrderCode() {
   const now = new Date();
@@ -11,21 +18,35 @@ function generateOrderCode() {
 }
 
 type CreateOrderInput = {
-  customerId: string;
-  discountCents?: number;  // Verificar se essas duas variaveis fazem sentido no projeto ainda ( discountCents e shippingCents )
-  shippingCents?: number;  // Verificar se essas duas variaveis fazem sentido no projeto ainda ( discountCents e shippingCents )
+  userId: string;
+  discountCents?: number;
+  shippingCents?: number;
+  paymentMethod?: string;
+  contact?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    taxId?: string;
+  };
+  delivery?: {
+    type?: string;
+    zipCode?: string;
+    address?: string;
+    number?: string;
+    complement?: string;
+  };
+  notes?: string;
 };
 
-export async function createOrderService(
-  input: CreateOrderInput,
-) {
-  const discountCents = input.discountCents ?? 0;  // Verificar se essas duas variaveis fazem sentido no projeto ainda ( discountCents e shippingCents )
-  const shippingCents = input.shippingCents ?? 0;  // Verificar se essas duas variaveis fazem sentido no projeto ainda ( discountCents e shippingCents )
+export async function createOrderService(input: CreateOrderInput) {
+  const discountCents = input.discountCents ?? 0;
+  const shippingCents = input.shippingCents ?? 0;
+  const paymentMethod = input.paymentMethod ?? "PIX";
+
+  const ensuredCustomer = await ensureCustomerForUserService(input.userId);
 
   const customer = await prisma.customer.findUnique({
-    where: {
-      userId: input.customerId,
-    },
+    where: { id: ensuredCustomer.id },
     include: {
       cart: {
         include: {
@@ -37,9 +58,7 @@ export async function createOrderService(
                 },
               },
             },
-            orderBy: {
-              createdAt: "asc",
-            },
+            orderBy: { createdAt: "asc" },
           },
         },
       },
@@ -47,24 +66,15 @@ export async function createOrderService(
   });
 
   if (!customer) {
-    throw {
-      status: 404,
-      message: "Customer não encontrado para este usuário.",
-    };
+    throw { status: 404, message: "Cliente não encontrado." };
   }
 
   if (!customer.cart) {
-    throw {
-      status: 404,
-      message: "Carrinho não encontrado.",
-    };
+    throw { status: 404, message: "Carrinho não encontrado." };
   }
 
   if (!customer.cart.items.length) {
-    throw {
-      status: 400,
-      message: "O carrinho está vazio.",
-    };
+    throw { status: 400, message: "O carrinho está vazio." };
   }
 
   let subtotalCents = 0;
@@ -73,10 +83,7 @@ export async function createOrderService(
     const product = cartItem.product;
 
     if (!product) {
-      throw {
-        status: 404,
-        message: "Produto do carrinho não encontrado.",
-      };
+      throw { status: 404, message: "Produto não encontrado." };
     }
 
     if (!product.isActive) {
@@ -89,26 +96,17 @@ export async function createOrderService(
     if (!product.inventory) {
       throw {
         status: 400,
-        message: `O produto ${product.name} não possui estoque configurado.`,
-      };
-    }
-
-    if (cartItem.quantity <= 0) {
-      throw {
-        status: 400,
-        message: `Quantidade inválida para o produto ${product.name}.`,
+        message: `O produto ${product.name} não possui estoque.`,
       };
     }
 
     if (product.inventory.quantity < cartItem.quantity) {
       throw {
         status: 400,
-        message: `Estoque insuficiente para o produto ${product.name}.`,
+        message: `Estoque insuficiente para ${product.name}.`,
       };
     }
-  
-    // Nesse caso aqui, o preço promocional tem prioridade sobre o preço normal, caso esteja definido. Se não houver preço promocional, o sistema usará o preço normal.
-    // Faz sentido?
+
     const unitPriceCents = product.promoPriceCents ?? product.priceCents;
     const totalCents = unitPriceCents * cartItem.quantity;
 
@@ -122,20 +120,74 @@ export async function createOrderService(
     };
   });
 
- // Verificar se essas duas variaveis fazem sentido no projeto ainda ( discountCents e shippingCents )
-  const totalCents = subtotalCents - discountCents + shippingCents; 
+  const totalCents = subtotalCents - discountCents + shippingCents;
 
-  if (totalCents < 0) {
-    throw {
-      status: 400,
-      message: "O total do pedido não pode ser negativo.",
-    };
+  if (totalCents <= 0) {
+    throw { status: 400, message: "Total do pedido inválido." };
+  }
+
+  const orderCode = generateOrderCode();
+  let checkout: any = null;
+  let abacateCustomer: any = null;
+
+  if (paymentMethod === "ABACATEPAY") {
+    try {
+      const checkoutItems = await Promise.all(
+        customer.cart.items.map(async (cartItem) => ({
+          id: await ensureAbacateProductService(cartItem.product.id),
+          quantity: cartItem.quantity,
+        })),
+      );
+
+      const contactEmail = input.contact?.email || customer.email;
+
+      if (contactEmail) {
+        try {
+          abacateCustomer = await createAbacateCustomer({
+            email: contactEmail,
+            name: input.contact?.name || customer.name,
+            cellphone: input.contact?.phone || customer.phone,
+            taxId: input.contact?.taxId || customer.document,
+            zipCode: input.delivery?.zipCode,
+          });
+        } catch (customerError) {
+          console.error(
+            "Erro ao criar cliente na AbacatePay, seguindo sem customer:",
+            customerError,
+          );
+        }
+      }
+
+      checkout = await createAbacatePayCheckout({
+        items: checkoutItems,
+        externalId: String(orderCode),
+        returnUrl:
+          process.env.ABACATEPAY_RETURN_URL || process.env.FRONTEND_URL,
+        completionUrl:
+          process.env.ABACATEPAY_COMPLETION_URL ||
+          `${process.env.FRONTEND_URL || ""}/loja/pedidos`,
+      });
+    } catch (error: any) {
+      console.error(
+        "Erro AbacatePay:",
+        error?.response?.data || error?.message || error,
+      );
+
+      throw {
+        status: error?.status || error?.response?.status || 400,
+        message:
+          error?.message ||
+          error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          "Falha ao gerar checkout no AbacatePay.",
+      };
+    }
   }
 
   const order = await prisma.$transaction(async (tx) => {
     const createdOrder = await tx.order.create({
       data: {
-        code: generateOrderCode(),
+        code: orderCode,
         customerId: customer.id,
         status: "PENDING",
         subtotalCents,
@@ -147,10 +199,19 @@ export async function createOrderService(
         },
         payments: {
           create: {
-            method: "PIX",
+            method: paymentMethod === "ABACATEPAY" ? "PIX" : "PIX",
             status: "PENDING",
             amountCents: totalCents,
-            gateway: "abacatepay",
+            gateway: paymentMethod === "ABACATEPAY" ? "abacatepay" : "manual",
+            gatewayPaymentId: checkout?.id || null,
+            externalId: String(orderCode),
+            checkoutUrl:
+              checkout?.url ||
+              checkout?.checkoutUrl ||
+              checkout?.data?.url ||
+              checkout?.data?.checkoutUrl ||
+              null,
+            rawResponse: (checkout ?? null) as Prisma.InputJsonValue,
           },
         },
       },
@@ -167,25 +228,32 @@ export async function createOrderService(
 
     for (const item of itemsData) {
       await tx.inventory.update({
-        where: {
-          productId: item.productId,
-        },
+        where: { productId: item.productId },
         data: {
-          quantity: {
-            decrement: item.quantity,
-          },
+          quantity: { decrement: item.quantity },
         },
       });
     }
 
     await tx.cartItem.deleteMany({
-      where: {
-        cartId: customer.cart!.id,
-      },
+      where: { cartId: customer.cart!.id },
     });
 
     return createdOrder;
   });
 
-  return order;
+  const redirectUrl =
+    checkout?.url ||
+    checkout?.checkoutUrl ||
+    checkout?.data?.url ||
+    checkout?.data?.checkoutUrl ||
+    order.payments?.[0]?.checkoutUrl ||
+    null;
+
+  return {
+    order,
+    payment: order.payments?.[0] ?? null,
+    redirectUrl,
+    checkoutUrl: redirectUrl,
+  };
 }

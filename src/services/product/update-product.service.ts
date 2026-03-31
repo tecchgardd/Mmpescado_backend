@@ -1,5 +1,6 @@
 import { prisma } from "../../database/prisma.js";
 import { cloudinary } from "../../utils/cloudinary.js";
+import { ensureAbacateProductService } from "./ensure-abacate-product.service.js";
 
 function extractCloudinaryPublicId(url: string): string | null {
   const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-z]+$/i);
@@ -124,7 +125,28 @@ export async function updateProductService(id: string, data: UpdateProductInput)
       }
     }
 
-    return product;
+    const shouldResync =
+      data.name !== undefined ||
+      data.description !== undefined ||
+      data.priceCents !== undefined ||
+      data.promoPriceCents !== undefined ||
+      data.isActive !== undefined;
+
+    if (product && shouldResync) {
+      try {
+        await ensureAbacateProductService(product.id, true);
+      } catch (syncError: any) {
+        console.error("Erro ao ressincronizar produto com AbacatePay:", syncError?.message || syncError);
+      }
+    }
+
+    return prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        inventory: true,
+      },
+    });
   } catch (error) {
     if (
       typeof error === "object" &&

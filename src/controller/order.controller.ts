@@ -16,17 +16,24 @@ class OrderController {
         });
       }
 
-      const order = await createOrderService({
-        customerId: userId,
+      const result = await createOrderService({
+        userId,
+        ...req.body,
       });
 
       return res.status(201).json({
         message: "Pedido criado com sucesso.",
-        order,
+        ...result,
       });
     } catch (error: any) {
+      console.error("Erro ao criar pedido:", error);
+
       return res.status(error?.status ?? 500).json({
         message: error?.message ?? "Erro ao criar pedido.",
+        error:
+          error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          undefined,
       });
     }
   }
@@ -54,6 +61,12 @@ class OrderController {
           | undefined,
         customerId,
         search,
+        requesterUserId: req.currentUser?.id,
+        requesterRole: (req.currentUser as any)?.role as
+          | "ADMIN"
+          | "STAFF"
+          | "USER"
+          | undefined,
       });
 
       return res.status(200).json(result);
@@ -64,9 +77,56 @@ class OrderController {
     }
   }
 
+  async listMine(req: Request, res: Response) {
+    try {
+      const userId = req.currentUser?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          message: "Não autenticado.",
+        });
+      }
+
+      const page = req.query.page ? Number(req.query.page) : 1;
+      const limit = req.query.limit ? Number(req.query.limit) : 10;
+      const status = req.query.status ? String(req.query.status) : undefined;
+      const search = req.query.search ? String(req.query.search) : undefined;
+
+      const result = await listOrdersService({
+        page,
+        limit,
+        status: status as
+          | "PENDING"
+          | "CONFIRMED"
+          | "PREPARING"
+          | "SHIPPED"
+          | "DELIVERED"
+          | "CANCELED"
+          | undefined,
+        search,
+        requesterUserId: userId,
+        requesterRole: "USER",
+      });
+
+      return res.status(200).json(result);
+    } catch (error: any) {
+      return res.status(error?.status ?? 500).json({
+        message: error?.message ?? "Erro ao listar seus pedidos.",
+      });
+    }
+  }
+
   async getById(req: Request, res: Response) {
     try {
-      const order = await getOrderByIdService(req.params.id);
+      const order = await getOrderByIdService(
+        req.params.id,
+        req.currentUser?.id,
+        (req.currentUser as any)?.role as
+          | "ADMIN"
+          | "STAFF"
+          | "USER"
+          | undefined,
+      );
 
       return res.status(200).json(order);
     } catch (error: any) {

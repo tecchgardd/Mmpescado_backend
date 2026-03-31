@@ -1,8 +1,14 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.js";
-import { createAbacateCheckout } from "./abacatepay-client.js";
+import { createAbacateCustomer, createAbacatePayCheckout } from "../../integrations/abacatepay.js";
+import { ensureCustomerForUserService } from "../customer/ensure-customer-for-user.service.js";
+import { ensureAbacateProductService } from "../product/ensure-abacate-product.service.js";
 
-export async function createCheckoutService(orderId: string) {
+export async function createCheckoutService(
+  orderId: string,
+  requesterUserId?: string,
+  requesterRole?: "ADMIN" | "STAFF" | "USER",
+) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
@@ -28,6 +34,24 @@ export async function createCheckoutService(orderId: string) {
       status: 400,
       message: "Pedido sem cliente vinculado.",
     };
+  }
+
+  if (requesterRole === "USER") {
+    if (!requesterUserId) {
+      throw {
+        status: 401,
+        message: "Não autenticado.",
+      };
+    }
+
+    const customer = await ensureCustomerForUserService(requesterUserId);
+
+    if (order.customerId !== customer.id) {
+      throw {
+        status: 403,
+        message: "Você não tem permissão para criar checkout para este pedido.",
+      };
+    }
   }
 
   if (!order.items.length) {
@@ -57,6 +81,8 @@ export async function createCheckoutService(orderId: string) {
       paymentId: existingPendingWithCheckout.id,
       checkoutUrl: existingPendingWithCheckout.checkoutUrl,
       status: existingPendingWithCheckout.status,
+      payment: existingPendingWithCheckout,
+      order,
     };
   }
 
@@ -71,38 +97,43 @@ export async function createCheckoutService(orderId: string) {
     };
   }
 
-  const externalId = order.code;
-
-  const payload = {
-    frequency: "ONE_TIME" as const,
-    methods: ["PIX", "CARD"] as ("PIX" | "CARD")[],
-    products: order.items.map((item) => ({
-      externalId: item.productId,
-      name: item.product.name,
-      price: item.unitPriceCents,
+  const checkoutItems = await Promise.all(
+    order.items.map(async (item) => ({
+      id: await ensureAbacateProductService(item.productId),
       quantity: item.quantity,
     })),
-    returnUrl: process.env.ABACATEPAY_RETURN_URL,
-    completionUrl: process.env.ABACATEPAY_COMPLETION_URL,
-    customer: {
-      name: order.customer.name,
-      email: order.customer.email ?? "sem-email@mmpescado.local",
-      cellphone: order.customer.phone ?? undefined,
-      taxId: order.customer.document ?? undefined,
+  );
+
+  let abacateCustomer: any = null;
+  if (order.customer.email) {
+    try {
+      abacateCustomer = await createAbacateCustomer({
+        email: order.customer.email,
+        name: order.customer.name,
+        cellphone: order.customer.phone ?? undefined,
+        taxId: order.customer.document ?? undefined,
+        zipCode: order.customer.zipCode ?? undefined,
+      });
+    } catch (customerError) {
+      console.error("Erro ao criar cliente AbacatePay no createCheckoutService:", customerError);
+    }
+  }
+
+  const gatewayResponse = await createAbacatePayCheckout({
+    items: checkoutItems,
+    methods: ["PIX", "CARD"],
+    externalId: order.code,
+    returnUrl: process.env.ABACATEPAY_RETURN_URL || process.env.FRONTEND_URL,
+    completionUrl: process.env.ABACATEPAY_COMPLETION_URL || `${process.env.FRONTEND_URL || ""}/loja/pedidos`,
+    customerId: abacateCustomer?.id,
+    metadata: {
+      orderId: order.id,
+      code: order.code,
     },
-  };
+  });
 
-  const gatewayResponse = await createAbacateCheckout(payload);
-
-  const checkoutId =
-    gatewayResponse?.data?.id ??
-    gatewayResponse?.id ??
-    null;
-
-  const checkoutUrl =
-    gatewayResponse?.data?.url ??
-    gatewayResponse?.url ??
-    null;
+  const checkoutId = gatewayResponse?.id ?? null;
+  const checkoutUrl = gatewayResponse?.url ?? null;
 
   if (!checkoutUrl) {
     throw {
@@ -119,7 +150,7 @@ export async function createCheckoutService(orderId: string) {
     data: {
       gateway: "abacatepay",
       gatewayPaymentId: checkoutId,
-      externalId,
+      externalId: order.code,
       checkoutUrl,
       rawResponse: gatewayResponse as Prisma.InputJsonValue,
     },
@@ -129,5 +160,7 @@ export async function createCheckoutService(orderId: string) {
     paymentId: payment.id,
     checkoutUrl: payment.checkoutUrl,
     status: payment.status,
+    payment,
+    order,
   };
 }

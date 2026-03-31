@@ -1,4 +1,5 @@
 import { prisma } from "../../database/prisma.js";
+import { ensureCustomerForUserService } from "../customer/ensure-customer-for-user.service.js";
 
 type ListOrdersInput = {
   page?: number;
@@ -12,16 +13,32 @@ type ListOrdersInput = {
     | "CANCELED";
   customerId?: string;
   search?: string;
+  requesterUserId?: string;
+  requesterRole?: "ADMIN" | "STAFF" | "USER";
 };
 
 export async function listOrdersService(params: ListOrdersInput) {
+  let resolvedCustomerId = params.customerId;
+
+  if (params.requesterRole === "USER") {
+    if (!params.requesterUserId) {
+      throw {
+        status: 401,
+        message: "Não autenticado.",
+      };
+    }
+
+    const customer = await ensureCustomerForUserService(params.requesterUserId);
+    resolvedCustomerId = customer.id;
+  }
+
   const page = params.page && params.page > 0 ? params.page : 1;
   const limit = params.limit && params.limit > 0 ? params.limit : 10;
   const skip = (page - 1) * limit;
 
   const where = {
     ...(params.status ? { status: params.status } : {}),
-    ...(params.customerId ? { customerId: params.customerId } : {}),
+    ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
     ...(params.search
       ? {
           OR: [

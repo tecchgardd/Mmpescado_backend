@@ -1,4 +1,5 @@
 import { prisma } from "../../database/prisma.js";
+import { ensureAbacateProductService } from "./ensure-abacate-product.service.js";
 
 export type CreateProductInput = {
   name: string;
@@ -66,7 +67,19 @@ export async function createProductService(data: CreateProductInput) {
       },
     });
 
-    return product;
+    try {
+      await ensureAbacateProductService(product.id);
+    } catch (syncError: any) {
+      console.error("Erro ao sincronizar produto com AbacatePay:", syncError?.message || syncError);
+    }
+
+    return prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        category: true,
+        inventory: true,
+      },
+    });
   } catch (error) {
     if (
       typeof error === "object" &&

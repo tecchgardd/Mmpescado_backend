@@ -1,19 +1,8 @@
-import { prisma } from "../../database/prisma.js";
 import { getOrCreateCartService } from "./get-or-create-cart.service.js";
+import { ensureCustomerForUserService } from "../customer/ensure-customer-for-user.service.js";
 
 export async function getMyCartService(userId: string) {
-  const customer = await prisma.customer.findUnique({
-    where: {
-      userId,
-    },
-  });
-
-  if (!customer) {
-    throw {
-      status: 404,
-      message: "Customer não encontrado para este usuário.",
-    };
-  }
+  const customer = await ensureCustomerForUserService(userId);
 
   const cart = await getOrCreateCartService(customer.id);
 

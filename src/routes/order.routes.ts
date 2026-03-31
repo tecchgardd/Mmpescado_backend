@@ -21,21 +21,35 @@ const updateOrderStatusSchema = z.object({
 orderRoutes.post(
   "/",
   requireAuth,
-  requireRole("ADMIN", "STAFF"),
+  requireRole("ADMIN", "STAFF", "USER"),
   orderController.create.bind(orderController),
+);
+
+orderRoutes.get(
+  "/me",
+  requireAuth,
+  requireRole("USER", "ADMIN", "STAFF"),
+  orderController.listMine.bind(orderController),
+);
+
+orderRoutes.get(
+  "/my",
+  requireAuth,
+  requireRole("USER", "ADMIN", "STAFF"),
+  orderController.listMine.bind(orderController),
 );
 
 orderRoutes.get(
   "/",
   requireAuth,
-  requireRole("ADMIN", "STAFF"),
+  requireRole("ADMIN", "STAFF", "USER"),
   orderController.list.bind(orderController),
 );
 
 orderRoutes.get(
   "/:id",
   requireAuth,
-  requireRole("ADMIN", "STAFF"),
+  requireRole("ADMIN", "STAFF", "USER"),
   orderController.getById.bind(orderController),
 );
 
