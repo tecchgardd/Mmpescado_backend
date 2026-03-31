@@ -16,6 +16,7 @@ export async function listCategoriesService() {
             name: true,
             description: true,
             priceCents: true,
+            promoPriceCents: true,
             imageUrl: true,
             inventory: {
               select: {
