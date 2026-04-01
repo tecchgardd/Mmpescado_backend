@@ -19,6 +19,8 @@ type AbacateCheckoutInput = {
   externalId?: string;
   returnUrl?: string;
   completionUrl?: string;
+  customerId?: string;
+  metadata?: Record<string, unknown>;
 };
 
 function getApiToken() {
@@ -206,6 +208,8 @@ export async function createAbacatePayCheckout(input: AbacateCheckoutInput) {
     if (input.externalId) body.externalId = String(input.externalId);
     if (input.returnUrl) body.returnUrl = input.returnUrl;
     if (input.completionUrl) body.completionUrl = input.completionUrl;
+    if (input.customerId) body.customerId = input.customerId;
+    if (input.metadata) body.metadata = input.metadata;
 
     console.log("Payload checkout AbacatePay:", JSON.stringify(body, null, 2));
 
