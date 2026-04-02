@@ -11,9 +11,10 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL!,
 
   trustedOrigins: [
-    'http://localhost:5173',                    // dev
-    'https://mm-pescados-front.vercel.app',     // produção                                                                                                     
+    'http://localhost:5173',
+    'https://mm-pescados-front.vercel.app',
   ],
+
   user: {
     additionalFields: {
       role: {
@@ -37,11 +38,11 @@ export const auth = betterAuth({
   },
 
   advanced: {
-    useSecureCookies: process.env.NODE_ENV === "production",
+    useSecureCookies: true,
     defaultCookieAttributes: {
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      sameSite: "none",
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
     },
   },
 });
