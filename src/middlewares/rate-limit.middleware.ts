@@ -15,6 +15,7 @@ export const authRateLimit = rateLimit({
   limit: 900,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV !== 'production', // pula em dev
   message: {
     message: "Muitas tentativas de autenticação. Tente novamente mais tarde.",
   },
