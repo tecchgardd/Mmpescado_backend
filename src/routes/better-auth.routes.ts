@@ -50,6 +50,9 @@ betterAuthRoutes.post(
   },
 );
 
-betterAuthRoutes.all("/*", toNodeHandler(auth));
+betterAuthRoutes.all("/*", (req, res) => {
+  req.url = req.originalUrl;
+  toNodeHandler(auth)(req as any, res as any);
+});
 
 export default betterAuthRoutes;
