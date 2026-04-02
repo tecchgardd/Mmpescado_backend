@@ -58,13 +58,10 @@ app.use(
     next();
   },
   authRateLimit,
-  betterAuthRoutes,
-  (req, res) => {
-    // Restore the full path before handing off to Better Auth
-    req.url = req.originalUrl;
-    toNodeHandler(auth)(req, res);
-  }
+  betterAuthRoutes
 );
+
+app.all("/api/auth/*", toNodeHandler(auth));
 
 app.use(
   "/api/webhooks",

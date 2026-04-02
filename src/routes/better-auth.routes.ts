@@ -1,9 +1,42 @@
 import express, { Router } from "express";
-import { fromNodeHeaders } from "better-auth/node";
+import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import { auth } from "../utils/auth.js";
 import { prisma } from "../database/prisma.js";
 
 const betterAuthRoutes = Router();
+
+betterAuthRoutes.post(
+  "/sign-in/email",
+  express.json(),
+  async (req, res) => {
+    try {
+      const { email, password } = req.body ?? {};
+
+      if (!email || !password) {
+        return res
+          .status(400)
+          .json({ message: "Email e senha são obrigatórios." });
+      }
+
+      const betterAuthRes = await auth.api.signInEmail({
+        body: { email, password },
+        headers: fromNodeHeaders(req.headers as Record<string, string | string[]>),
+        asResponse: true,
+      });
+
+      const setCookieHeader = betterAuthRes.headers.get("set-cookie");
+      if (setCookieHeader) {
+        res.setHeader("Set-Cookie", setCookieHeader);
+      }
+
+      const body = await betterAuthRes.json();
+      return res.status(betterAuthRes.status).json(body);
+    } catch (error) {
+      console.error("Erro no login:", error);
+      return res.status(500).json({ message: "Erro interno no servidor." });
+    }
+  },
+);
 
 betterAuthRoutes.post(
   "/sign-in/email/admin",
