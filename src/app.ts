@@ -51,7 +51,6 @@ app.get("/", (_req, res) => {
   });
 });
 
-// Admin endpoint (custom, before Better Auth catch-all)
 app.use(
   "/api/auth",
   (_req, res, next) => {
@@ -59,13 +58,13 @@ app.use(
     next();
   },
   authRateLimit,
-  betterAuthRoutes
+  betterAuthRoutes,
+  (req, res) => {
+    // Restore the full path before handing off to Better Auth
+    req.url = req.originalUrl;
+    toNodeHandler(auth)(req, res);
+  }
 );
-
-// Better Auth catch-all: app.all does NOT strip the path prefix from req.url
-app.all("/api/auth/*path", (req, res) => {
-  toNodeHandler(auth)(req, res);
-});
 
 app.use(
   "/api/webhooks",
