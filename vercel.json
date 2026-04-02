@@ -1,18 +1,18 @@
 {
-    "version": 2,
-    "builds": [
-        {
-            "src": "src/app.ts",
-            "use": "@vercel/node",
-            "config": {
-                "includeFiles": ["node_modules/.prisma/**"]
-            }
-        }
-    ],
-    "routes": [
-        {
-            "src": "/(.*)",
-            "dest": "src/app.ts"
-        }
-    ]
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/index.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["node_modules/.prisma/**"]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/index.ts"
+    }
+  ]
 }
