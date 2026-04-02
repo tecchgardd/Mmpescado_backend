@@ -1,5 +1,5 @@
 import express, { Router } from "express";
-import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
+import { fromNodeHeaders } from "better-auth/node";
 import { auth } from "../utils/auth.js";
 import { prisma } from "../database/prisma.js";
 
@@ -49,10 +49,5 @@ betterAuthRoutes.post(
     }
   },
 );
-
-betterAuthRoutes.all("/*", (req, res) => {
-  req.url = req.originalUrl;
-  toNodeHandler(auth)(req as any, res as any);
-});
 
 export default betterAuthRoutes;

@@ -11,6 +11,8 @@ import {
   webhookRateLimit,
 } from "./middlewares/rate-limit.middleware.js";
 import cors from "cors";
+import { toNodeHandler } from "better-auth/node";
+import { auth } from "./utils/auth.js";
 
 const app = express();
 
@@ -49,6 +51,7 @@ app.get("/", (_req, res) => {
   });
 });
 
+// Admin endpoint (custom, before Better Auth catch-all)
 app.use(
   "/api/auth",
   (_req, res, next) => {
@@ -58,6 +61,11 @@ app.use(
   authRateLimit,
   betterAuthRoutes
 );
+
+// Better Auth catch-all: app.all does NOT strip the path prefix from req.url
+app.all("/api/auth/*", (req, res) => {
+  toNodeHandler(auth)(req, res);
+});
 
 app.use(
   "/api/webhooks",
