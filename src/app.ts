@@ -63,7 +63,7 @@ app.use(
 );
 
 // Better Auth catch-all: app.all does NOT strip the path prefix from req.url
-app.all("/api/auth/*", (req, res) => {
+app.all("/api/auth/*path", (req, res) => {
   toNodeHandler(auth)(req, res);
 });
 
