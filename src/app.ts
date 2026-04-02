@@ -27,21 +27,37 @@ const allowedOrigins = (process.env.CORS_ORIGIN ?? "")
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
-        callback(null, origin || "*");
-      } else {
-        callback(new Error("Not allowed by CORS"));
+      if (!origin) {
+        return callback(null, true);
       }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-app.use("/api/auth", (_req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
-  next();
-}, authRateLimit, betterAuthRoutes);
+
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    message: "MM Pescado backend online",
+  });
+});
+
+app.use(
+  "/api/auth",
+  (_req, res, next) => {
+    res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
+    next();
+  },
+  authRateLimit,
+  betterAuthRoutes
+);
 
 app.use(
   "/api/webhooks",
@@ -51,7 +67,7 @@ app.use(
       req.rawBody = buf.toString("utf8");
     },
   }),
-  webhookRoutes,
+  webhookRoutes
 );
 
 app.use(express.json());
