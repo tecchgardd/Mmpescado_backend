@@ -21,6 +21,17 @@ export const authRateLimit = rateLimit({
   },
 });
 
+export const authSocialRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 1800,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV !== 'production',
+  message: {
+    message: "Muitas requisições de autenticação social. Tente novamente mais tarde.",
+  },
+});
+
 export const webhookRateLimit = rateLimit({
   windowMs: 1 * 60 * 1000,
   limit: 120,

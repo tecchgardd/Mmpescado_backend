@@ -1,12 +1,14 @@
 import express, { Router } from "express";
-import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
+import { fromNodeHeaders } from "better-auth/node";
 import { auth } from "../utils/auth.js";
 import { prisma } from "../database/prisma.js";
+import { authRateLimit } from "../middlewares/rate-limit.middleware.js";
 
 const betterAuthRoutes = Router();
 
 betterAuthRoutes.post(
   "/sign-in/email",
+  authRateLimit,
   express.json(),
   async (req, res) => {
     try {
@@ -40,6 +42,7 @@ betterAuthRoutes.post(
 
 betterAuthRoutes.post(
   "/sign-in/email/admin",
+  authRateLimit,
   express.json(),
   async (req, res) => {
     try {

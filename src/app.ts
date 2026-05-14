@@ -7,6 +7,7 @@ import webhookRoutes from "./routes/webhook.routes.js";
 import { httpLogger } from "./middlewares/logger.middleware.js";
 import {
   authRateLimit,
+  authSocialRateLimit,
   globalRateLimit,
   webhookRateLimit,
 } from "./middlewares/rate-limit.middleware.js";
@@ -57,11 +58,10 @@ app.use(
     res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
     next();
   },
-  authRateLimit,
   betterAuthRoutes
 );
 
-app.all("/api/auth/*", toNodeHandler(auth));
+app.all("/api/auth/*", authSocialRateLimit, toNodeHandler(auth));
 
 app.use(
   "/api/webhooks",
