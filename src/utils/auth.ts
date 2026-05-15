@@ -2,6 +2,18 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "../database/prisma.js";
 
+const trustedOrigins = [
+  "http://127.0.0.1:5173",
+  "http://localhost:5173",
+
+  process.env.FRONTEND_URL,
+  process.env.LOJA_URL,
+  process.env.ADMIN_URL,
+  process.env.BILHETERIA_URL,
+
+  process.env.BETTER_AUTH_URL,
+].filter(Boolean) as string[];
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
@@ -10,12 +22,7 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL!,
 
-  trustedOrigins: [
-    "http://127.0.0.1:5173",
-    "http://localhost:5173",
-    process.env.FRONTEND_URL,
-    process.env.BETTER_AUTH_URL,
-  ].filter(Boolean) as string[],
+  trustedOrigins,
 
   user: {
     additionalFields: {
@@ -33,14 +40,14 @@ export const auth = betterAuth({
   },
 
   socialProviders: {
-  google: {
-    clientId: process.env.GOOGLE_CLIENT_ID!,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    redirectURI:
-      process.env.GOOGLE_REDIRECT_URI ||
-      `${process.env.BETTER_AUTH_URL ?? "https://mmpescado-backend.vercel.app"}/api/auth/callback/google`,
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      redirectURI:
+        process.env.GOOGLE_REDIRECT_URI ||
+        `${process.env.BETTER_AUTH_URL ?? "https://mmpescado-backend.vercel.app"}/api/auth/callback/google`,
+    },
   },
-},
 
   advanced: {
     useSecureCookies: true,
