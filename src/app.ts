@@ -22,10 +22,13 @@ app.set("trust proxy", 1);
 app.use(httpLogger);
 app.use(globalRateLimit);
 
-const allowedOrigins = (process.env.CORS_ORIGIN ?? "")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
+const allowedOrigins = [
+  ...(process.env.CORS_ORIGIN ?? "").split(",").map((o) => o.trim()),
+  process.env.FRONTEND_URL,
+  process.env.BETTER_AUTH_URL,
+]
+  .filter(Boolean)
+  .map((origin) => origin!.toString().trim());
 
 app.use(
   cors({

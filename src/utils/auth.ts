@@ -12,9 +12,10 @@ export const auth = betterAuth({
 
   trustedOrigins: [
     "http://127.0.0.1:5173",
-    'http://localhost:5173',
-    'https://mm-pescados-front.vercel.app',
-  ],
+    "http://localhost:5173",
+    process.env.FRONTEND_URL,
+    process.env.BETTER_AUTH_URL,
+  ].filter(Boolean) as string[],
 
   user: {
     additionalFields: {
@@ -35,7 +36,9 @@ export const auth = betterAuth({
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID!,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    redirectURI: "https://mmpescado-backend.vercel.app/api/auth/callback/google",
+    redirectURI:
+      process.env.GOOGLE_REDIRECT_URI ||
+      `${process.env.BETTER_AUTH_URL ?? "https://mmpescado-backend.vercel.app"}/api/auth/callback/google`,
   },
 },
 
