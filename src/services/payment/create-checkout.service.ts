@@ -1,11 +1,6 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.js";
-import {
-  createAbacateCustomer,
-  createAbacatePayCheckout,
-} from "../../integrations/abacatepay.js";
 import { ensureCustomerForUserService } from "../customer/ensure-customer-for-user.service.js";
-import { ensureAbacateProductService } from "../product/ensure-abacate-product.service.js";
+import { getWhatsAppUrl } from "../../utils/whatsapp.js";
 
 type RequesterRole = "ADMIN" | "STAFF" | "USER";
 
@@ -83,7 +78,7 @@ export async function createCheckoutService(
   }
 
   const existingApproved = order.payments.find(
-    (payment) => payment.status === "APPROVED",
+    (payment: any) => payment.status === "APPROVED",
   );
 
   if (existingApproved) {
@@ -96,7 +91,7 @@ export async function createCheckoutService(
   }
 
   const existingPendingWithCheckout = order.payments.find(
-    (payment) => payment.status === "PENDING" && Boolean(payment.checkoutUrl),
+    (payment: any) => payment.status === "PENDING" && Boolean(payment.checkoutUrl),
   );
 
   if (existingPendingWithCheckout) {
@@ -110,7 +105,7 @@ export async function createCheckoutService(
   }
 
   const existingPending = order.payments.find(
-    (payment) => payment.status === "PENDING",
+    (payment: any) => payment.status === "PENDING",
   );
 
   if (!existingPending) {
@@ -122,70 +117,24 @@ export async function createCheckoutService(
     throw error;
   }
 
-  const checkoutItems = await Promise.all(
-    order.items.map(async (item) => ({
-      id: await ensureAbacateProductService(item.productId),
-      quantity: item.quantity,
-    })),
-  );
-
-  let abacateCustomer: { id?: string } | null = null;
-
-  if (order.customer.email) {
-    try {
-      abacateCustomer = await createAbacateCustomer({
-        email: order.customer.email,
-        name: order.customer.name,
-        cellphone: order.customer.phone ?? undefined,
-        taxId: order.customer.document ?? undefined,
-        zipCode: order.customer.zipCode ?? undefined,
-      });
-    } catch (customerError) {
-      console.error(
-        "Erro ao criar cliente AbacatePay no createCheckoutService:",
-        customerError,
-      );
-    }
-  }
-
-  const gatewayResponse = await createAbacatePayCheckout({
-    items: checkoutItems,
-    externalId: order.code,
-    returnUrl:
-      process.env.ABACATEPAY_RETURN_URL || process.env.FRONTEND_URL,
-    completionUrl:
-      process.env.ABACATEPAY_COMPLETION_URL ||
-      `${process.env.FRONTEND_URL || ""}/loja/pedidos`,
-    customerId: abacateCustomer?.id,
-    metadata: {
-      orderId: order.id,
-      code: order.code,
-    },
+  const checkoutUrl = getWhatsAppUrl({
+    orderCode: order.code,
+    totalCents: order.totalCents,
   });
-
-  const checkoutId = gatewayResponse?.id ?? null;
-  const checkoutUrl = gatewayResponse?.url ?? null;
-
-  if (!checkoutUrl) {
-    const error: ServiceError = {
-      status: 500,
-      message: "Checkout criado sem URL de pagamento.",
-      details: gatewayResponse,
-    };
-
-    throw error;
-  }
 
   const payment = await prisma.payment.update({
     where: {
       id: existingPending.id,
     },
     data: {
-      gateway: "abacatepay",
-      gatewayPaymentId: checkoutId,
+      gateway: "manual",
+      gatewayPaymentId: null,
       externalId: order.code,
       checkoutUrl,
-      rawResponse: gatewayResponse as Prisma.InputJsonValue,
+      rawResponse: {
+        type: "whatsapp",
+        url: checkoutUrl,
+      } as any,
     },
   });
 

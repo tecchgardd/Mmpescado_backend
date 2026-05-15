@@ -2,7 +2,7 @@ export const paymentPaths = {
   "/payments/checkout/{orderId}": {
     post: {
       tags: ["Payments"],
-      summary: "Criar checkout AbacatePay para um pedido",
+      summary: "Criar link de pagamento via WhatsApp para um pedido",
       security: [{ bearerAuth: [] }],
       parameters: [
         {
@@ -41,23 +41,4 @@ export const paymentPaths = {
     },
   },
 
-  "/webhooks/abacatepay": {
-    post: {
-      tags: ["Webhooks"],
-      summary: "Webhook da AbacatePay",
-      parameters: [
-        {
-          name: "webhookSecret",
-          in: "query",
-          required: true,
-          schema: { type: "string" },
-        },
-      ],
-      responses: {
-        200: {
-          description: "Webhook processado com sucesso.",
-        },
-      },
-    },
-  },
 };

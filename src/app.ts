@@ -3,13 +3,10 @@ import swaggerUi from "swagger-ui-express";
 import { openapi } from "./docs/openapi.js";
 import routes from "./routes/index.js";
 import betterAuthRoutes from "./routes/better-auth.routes.js";
-import webhookRoutes from "./routes/webhook.routes.js";
 import { httpLogger } from "./middlewares/logger.middleware.js";
 import {
-  authRateLimit,
   authSocialRateLimit,
   globalRateLimit,
-  webhookRateLimit,
 } from "./middlewares/rate-limit.middleware.js";
 import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
@@ -65,17 +62,6 @@ app.use(
 );
 
 app.all("/api/auth/*", authSocialRateLimit, toNodeHandler(auth));
-
-app.use(
-  "/api/webhooks",
-  webhookRateLimit,
-  express.json({
-    verify: (req: any, _res, buf) => {
-      req.rawBody = buf.toString("utf8");
-    },
-  }),
-  webhookRoutes
-);
 
 app.use(express.json());
 
