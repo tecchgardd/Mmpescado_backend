@@ -36,7 +36,20 @@ type CreateOrderInput = {
 export async function createOrderService(input: CreateOrderInput) {
   const discountCents = input.discountCents ?? 0;
   const shippingCents = input.shippingCents ?? 0;
-  const paymentMethod = input.paymentMethod ?? "PIX";
+
+  // Mapeia os valores do frontend para o enum do banco
+  const paymentMethodMap: Record<string, string> = {
+    Pix: "PIX",
+    PIX: "PIX",
+    Cartão: "CREDIT_CARD",
+    Cartao: "CREDIT_CARD",
+    CREDIT_CARD: "CREDIT_CARD",
+    DEBIT_CARD: "DEBIT_CARD",
+    Dinheiro: "CASH",
+    CASH: "CASH",
+  };
+  const rawMethod = input.paymentMethod ?? "PIX";
+  const paymentMethod = paymentMethodMap[rawMethod] ?? "PIX";
 
   const ensuredCustomer = await ensureCustomerForUserService(input.userId);
 

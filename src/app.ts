@@ -22,6 +22,9 @@ app.use(globalRateLimit);
 const allowedOrigins = [
   ...(process.env.CORS_ORIGIN ?? "").split(",").map((o) => o.trim()),
   process.env.FRONTEND_URL,
+  process.env.LOJA_URL,
+  process.env.ADMIN_URL,
+  process.env.BILHETERIA_URL,
   process.env.BETTER_AUTH_URL,
 ]
   .filter(Boolean)
